@@ -90,9 +90,9 @@ def find_windows_browser(executable: str):
         import winreg
         for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
             try:
-                with winreg.OpenKey(hive, rf"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\{executable}") as key:
+                with winreg.OpenKey(hive, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{executable}") as key:
                     value, _ = winreg.QueryValueEx(key, None)
-                    candidates.insert(0, Path(value))
+                    candidates.insert(0, Path(os.path.expandvars(str(value).strip(chr(34)))))
             except OSError:
                 pass
     except ImportError:

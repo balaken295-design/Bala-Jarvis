@@ -44,6 +44,10 @@ Tailscale Serve may prompt you to enable HTTPS certificates for your tailnet. Ke
 - Browser speech recognition may require a first manual microphone permission/action.
 - The wake listener runs on the PC; Android browsers do not provide reliable always-on background wake-word listening.
 
+## Windows call notification bridge
+
+A Windows companion source project is available in `windows-bridge/`. It uses Microsoft's UserNotificationListener API and requires a packaged UWP app plus explicit user permission. It can forward recent Windows toast notifications from Phone Link, WhatsApp Desktop, and Microsoft Teams when their notification text looks like an incoming-call alert. The companion must remain open; app notification formats and Windows settings may prevent some alerts from appearing. It is not a call-control feature. Build instructions and privacy limitations are in `windows-bridge/README.md`.
+
 ## Phone and call notification bridge (prototype)
 
 The server now provides a local notification feed:

@@ -21,7 +21,15 @@ This is a foreground UWP companion prototype for Windows 10/11. It uses Microsof
 3. Build and deploy the app to your local PC.
 4. Launch **BALA JARVIS Windows Bridge**.
 5. Select **Grant notification access** and approve Windows' permission prompt.
-6. Keep this app open while you want the dashboard to monitor notifications.
-7. Make sure `python jarvis_server.py` is running on the same PC.
+6. In PowerShell, find the installed package family name:
+   ```powershell
+   Get-AppxPackage | Where-Object { $_.Name -like "*BalaJarvisWindowsBridge*" } | Select-Object Name, PackageFamilyName
+   ```
+7. If the bridge cannot reach the local server, add a loopback exemption for that package (run PowerShell as Administrator and replace the placeholder with the exact PackageFamilyName):
+   ```powershell
+   CheckNetIsolation.exe LoopbackExempt -a -n="PASTE_PACKAGE_FAMILY_NAME"
+   ```
+8. Keep this app open while you want the dashboard to monitor notifications.
+9. Make sure `python jarvis_server.py` is running on the same PC.
 
 The bridge sends to loopback only (127.0.0.1); it does not send Windows notifications over the network or to the Android companion.

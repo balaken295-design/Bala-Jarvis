@@ -8,6 +8,7 @@ import platform
 import shutil
 import subprocess
 import webbrowser
+import os
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote_plus, urlparse
@@ -62,6 +63,46 @@ def system_info() -> str:
     return "\n".join(info)
 
 
+
+
+def find_windows_browser(executable: str):
+    """Find common browser installations even when their folders are not on PATH."""
+    candidates = []
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
+    program_files = [os.environ.get("PROGRAMFILES"), os.environ.get("PROGRAMFILES(X86)"),
+                     os.environ.get("PROGRAMW6432")]
+    if executable == "chrome.exe":
+        candidates.extend([local / "Google/Chrome/Application/chrome.exe"])
+        for base in program_files:
+            if base:
+                candidates.append(Path(base) / "Google/Chrome/Application/chrome.exe")
+    elif executable == "msedge.exe":
+        candidates.append(local / "Microsoft/Edge/Application/msedge.exe")
+        for base in program_files:
+            if base:
+                candidates.append(Path(base) / "Microsoft/Edge/Application/msedge.exe")
+    elif executable == "firefox.exe":
+        candidates.append(local / "Mozilla Firefox/firefox.exe")
+        for base in program_files:
+            if base:
+                candidates.append(Path(base) / "Mozilla Firefox/firefox.exe")
+    try:
+        import winreg
+        for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+            try:
+                with winreg.OpenKey(hive, rf"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\{executable}") as key:
+                    value, _ = winreg.QueryValueEx(key, None)
+                    candidates.insert(0, Path(value))
+            except OSError:
+                pass
+    except ImportError:
+        pass
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
 def open_app(name: str) -> str:
     """Open a supported desktop app: Chrome, Edge, Firefox, Notepad, Calculator, Paint or File Explorer."""
     key = name.strip().lower()
@@ -70,12 +111,14 @@ def open_app(name: str) -> str:
         return "That app is not in my safe app list. I can open Chrome, Edge, Firefox, Notepad, Calculator, Paint or File Explorer."
     if OS == "Windows":
         path = shutil.which(executable)
+        if not path and executable in {"chrome.exe", "msedge.exe", "firefox.exe"}:
+            path = find_windows_browser(executable)
         if path:
             subprocess.Popen([path], shell=False)
         elif key in {"file explorer", "explorer"}:
             subprocess.Popen(["explorer.exe"], shell=False)
         else:
-            return f"I couldn't find {name} on this PC."
+            return f"I couldn't find {name} on this PC. Check that it is installed for this Windows user."
     elif OS == "Darwin":
         mac_names = {"notepad": "TextEdit", "calculator": "Calculator", "calc": "Calculator",
                      "chrome": "Google Chrome", "google chrome": "Google Chrome",

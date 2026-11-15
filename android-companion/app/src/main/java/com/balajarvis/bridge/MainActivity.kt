@@ -31,6 +31,7 @@ class MainActivity : Activity() {
             setTextColor(0xFFFFFFFF.toInt()); setHintTextColor(0xFF78909C.toInt())
         }
         root.addView(url)
+        val status = label("Status: save your PC address, then enable notification access.")
         val save = Button(this).apply {
             text = "SAVE PC ADDRESS"
             setOnClickListener {
@@ -47,7 +48,6 @@ class MainActivity : Activity() {
             setOnClickListener { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
         }
         root.addView(permission)
-        val status = label("Status: save your PC address, then enable notification access.")
         root.addView(status)
         root.addView(label("Only notifications recognised as call alerts are forwarded. Notification access is controlled by Android Settings."))
         setContentView(root)

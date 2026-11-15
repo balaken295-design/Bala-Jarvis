@@ -44,6 +44,20 @@ Tailscale Serve may prompt you to enable HTTPS certificates for your tailnet. Ke
 - Browser speech recognition may require a first manual microphone permission/action.
 - The wake listener runs on the PC; Android browsers do not provide reliable always-on background wake-word listening.
 
+## Phone and call notification bridge (prototype)
+
+The server now provides a local notification feed:
+- `GET /api/notifications` returns recent events.
+- `POST /api/notifications` accepts a small JSON event from a trusted bridge client.
+
+### Android companion
+An Android Studio project is in `android-companion/`. It uses Android's user-granted Notification Listener access and forwards only notifications identified as call-related to the PC's private Tailscale HTTPS address. It does not request call-log, contacts, microphone, or SMS permissions. See `android-companion/README.md` before installing; notification access is sensitive and caller details depend on what the dialer exposes.
+
+### Windows incoming calls
+The dashboard can display Windows-source events, but a native Windows notification listener is not included yet. Windows support depends on the calling app (for example Phone Link, Teams, or WhatsApp Desktop) and requires a separate integration. Phone Link may mirror Android call notifications, which is different from detecting native Windows app calls.
+
+Keep the server private on your Tailscale tailnet. Do not expose it with Funnel or router port forwarding. This prototype does not include app-level pairing authentication; only use it on a tailnet you control.
+
 ## Troubleshooting
 - Ollama unavailable: start Ollama and run `ollama list`.
 - Missing model: `ollama pull qwen2.5:7b`.

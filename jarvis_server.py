@@ -9,6 +9,7 @@ import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import psutil
 import jarvis_ollama as brain
@@ -59,9 +60,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_bytes(body, "application/json; charset=utf-8", status)
 
     def do_GET(self):
-        if self.path == "/stats":
+        path = urlsplit(self.path).path
+        if path == "/stats":
             return self.send_json(get_stats())
-        if self.path not in ("/", "/index.html"):
+        if path not in ("/", "/index.html"):
             return self.send_json({"error": "Not found"}, 404)
         try:
             return self.send_bytes(PAGE.read_bytes(), "text/html; charset=utf-8")

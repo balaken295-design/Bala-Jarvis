@@ -14,7 +14,7 @@ def wake():
         for _ in range(30):
             time.sleep(.5)
             if server_up():break
-    if server_up():subprocess.Popen(f'start "" msedge --app={URL}',shell=True)
+    if server_up():subprocess.Popen(f'start "" msedge --app="{URL}/?wake=1"',shell=True)
 def main():
     model=Model(wakeword_models=["hey_jarvis"],inference_framework="onnx");last=0
     print('Listening offline for "Hey Jarvis". Ctrl+C to stop.')

@@ -62,6 +62,7 @@ namespace BalaJarvisWindowsBridge
                 foreach (var item in notifications)
                 {
                     if (sentIds.Contains(item.Id)) continue;
+                    if (item.CreationTime < DateTimeOffset.Now.AddMinutes(-2)) continue;
                     var appName = item.AppInfo?.DisplayInfo?.DisplayName ?? item.AppInfo?.Id ?? "Windows app";
                     var appId = item.AppInfo?.Id ?? "";
                     var appIdentity = (appName + " " + appId).ToLowerInvariant();

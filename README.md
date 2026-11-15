@@ -1,43 +1,55 @@
 # BALA JARVIS
 
-A Windows-first local AI voice assistant with a futuristic browser HUD.
-
-## Features
-- Local AI chat through Ollama
-- Live CPU, RAM, disk, battery and network statistics
-- Browser speech input/output (English/Tamil support depends on browser voices)
-- Optional offline Windows wake-word listener for "Hey Jarvis"
-- Localhost-only server by default
+A Windows-first local AI assistant with an Ollama brain, browser HUD, optional offline "Hey Jarvis" wake listener, and private Android access.
 
 ## Requirements
-- Windows 10/11, Python 3.10+, Chrome or Edge
-- [Ollama for Windows](https://ollama.com/download)
-- Microphone for voice features
+- Windows 10/11, Python 3.10+, Chrome or Edge, microphone
+- [Ollama](https://ollama.com/download)
+- [Tailscale](https://tailscale.com/download) on the PC and Android phone for private mobile access
 
-## Setup
-1. Install Python and enable **Add Python to PATH**.
-2. Install Ollama and run `ollama pull qwen2.5:7b`.
-3. Clone/download this repository.
-4. Run `start_jarvis.bat`.
-5. Open http://127.0.0.1:8000 and allow microphone access.
+## PC setup
+1. Install Python and select **Add Python to PATH**.
+2. Install Ollama, then run `ollama pull qwen2.5:7b`.
+3. Clone this repository and open its folder.
+4. Run `start_jarvis.bat`; allow microphone permission in the browser.
+5. Test chat and the Listen button at `http://127.0.0.1:8000`.
 
-Manual setup:
-```powershell
-python -m pip install -r requirements.txt
-python jarvis_server.py
-```
+## Hey Jarvis wake word
+The optional offline listener uses openWakeWord's pretrained `hey_jarvis` model.
+1. Run `start_wake.bat` once to test. Keep the PC microphone connected and allow desktop microphone access if Windows asks.
+2. Say "Hey Jarvis". The listener opens the Jarvis page with voice recognition requested.
+3. For automatic launch at Windows sign-in, right-click PowerShell and choose **Run as administrator**, then run:
+   `powershell -ExecutionPolicy Bypass -File .\install_wake_startup.ps1`
+4. To remove the startup task, run:
+   `Unregister-ScheduledTask -TaskName "BalaJarvisWake" -Confirm:$false`
 
-## "Hey Jarvis" on Windows
-Run `python jarvis_wake.py` to test the offline listener. To start at login, put a shortcut to `start_wake.bat` in the Windows Startup folder (Win+R, then `shell:startup`). The first run may download the wake-word model.
+**Important:** Wake-word detection is offline, but browser speech recognition availability and hands-free auto-start vary by browser/Windows permissions. If the browser blocks automatic microphone start, tap **Listen** once. The wake listener opens the interface; it does not guarantee speech recognition on every browser.
 
-## Mobile access
-Mobile/LAN access is intentionally not enabled yet. The server binds to `127.0.0.1` because a desktop assistant must not be exposed to other devices without authentication and encrypted transport. A future phone pairing feature should use HTTPS and revocable device tokens. A mobile browser cannot reliably listen for wake words continuously in the background; that generally requires a dedicated mobile app.
+## Android private connection
+This uses Tailscale Serve so the PC's web server stays bound to localhost and receives HTTPS traffic only through your private tailnet.
+1. Install Tailscale on the Windows PC and Android phone. Sign in to the same private tailnet on both.
+2. Start BALA JARVIS on the PC using `start_jarvis.bat`.
+3. Open a second PowerShell window and run:
+   `tailscale serve 8000`
+4. Tailscale prints a private HTTPS address ending in `.ts.net`. Open that exact address on your Android phone while Tailscale is connected.
+5. In Chrome, use **Add to Home screen** or **Install app** to place BALA JARVIS on your home screen.
+
+Tailscale Serve may prompt you to enable HTTPS certificates for your tailnet. Keep the server running on the PC. The phone can use chat and browser voice while the PC is online. Desktop-only tools execute on the PC.
+
+**Never use Tailscale Funnel or router port-forwarding for this app.** Keep access inside your tailnet. Do not share your Tailscale login or device access with others.
+
+## Current limitations
+- This is a mobile-friendly installable web app, not a native Android APK.
+- The PC must be on, awake, running Ollama, and connected to Tailscale.
+- Browser speech recognition may require a first manual microphone permission/action.
+- The wake listener runs on the PC; Android browsers do not provide reliable always-on background wake-word listening.
 
 ## Troubleshooting
-- Ollama connection error: open Ollama and check `ollama list`.
-- Missing model: run `ollama pull qwen2.5:7b`.
-- Microphone blocked: use Chrome/Edge and allow microphone permission.
-- NVIDIA GPU readings require `nvidia-smi`; CPU temperature may not be exposed.
+- Ollama unavailable: start Ollama and run `ollama list`.
+- Missing model: `ollama pull qwen2.5:7b`.
+- Wake listener dependencies: run `python -m pip install -r requirements.txt`.
+- Check Tailscale Serve: `tailscale serve status`.
+- Microphone: use Chrome/Edge and grant microphone permission.
 
 ## Privacy
-The server listens only on this computer by default. Do not expose port 8000 to the public internet. Review any suggested action before running it.
+The Python server binds to `127.0.0.1`. Tailscale Serve is the private HTTPS bridge. Do not expose port 8000 publicly.

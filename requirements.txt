@@ -1,0 +1,4 @@
+ollama
+psutil
+openwakeword==0.6.0
+sounddevice

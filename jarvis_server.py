@@ -1,42 +1,116 @@
-"""Local BALA JARVIS HTTP server. Run: python jarvis_server.py"""
-import json,sys,time,webbrowser
-from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
+"""BALA JARVIS local web server.
+Run: python jarvis_server.py, then open http://127.0.0.1:8000
+The server intentionally binds to localhost; mobile/LAN access needs a secure
+pairing/authentication layer and is not enabled in this version.
+"""
+import json
+import threading
+import time
+import webbrowser
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
 import psutil
 import jarvis_ollama as brain
-PAGE=Path(__file__).with_name("jarvis_ui.html")
-history=[{"role":"system","content":brain.SYSTEM_PROMPT}]
-net=[psutil.net_io_counters(),time.time()]
-def stats():
-    now,io=time.time(),psutil.net_io_counters();dt=max(now-net[1],.1)
-    up=(io.bytes_sent-net[0].bytes_sent)/dt/1024;down=(io.bytes_recv-net[0].bytes_recv)/dt/1024
-    net[:]=[io,now];bat=psutil.sensors_battery()
-    return {"cpu":psutil.cpu_percent(),"ram":psutil.virtual_memory().percent,"disk":psutil.disk_usage(Path.home().anchor or "/").percent,"battery":{"pct":round(bat.percent),"plugged":bat.power_plugged} if bat else None,"up":round(up),"down":round(down)}
+
+PAGE = Path(__file__).with_name("jarvis_ui.html")
+messages = [{"role": "system", "content": brain.SYSTEM_PROMPT}]
+chat_lock = threading.Lock()
+stats_lock = threading.Lock()
+previous_net = [psutil.net_io_counters(), time.monotonic()]
+
+
+def get_stats():
+    now = time.monotonic()
+    current = psutil.net_io_counters()
+    with stats_lock:
+        elapsed = max(now - previous_net[1], 0.1)
+        upload = (current.bytes_sent - previous_net[0].bytes_sent) / elapsed / 1024
+        download = (current.bytes_recv - previous_net[0].bytes_recv) / elapsed / 1024
+        previous_net[:] = [current, now]
+
+    battery = psutil.sensors_battery()
+    root = Path.home().anchor or "/"
+    return {
+        "cpu": psutil.cpu_percent(),
+        "ram": psutil.virtual_memory().percent,
+        "disk": psutil.disk_usage(root).percent,
+        "battery": (
+            {"pct": round(battery.percent), "plugged": battery.power_plugged}
+            if battery else None
+        ),
+        "up": round(upload),
+        "down": round(download),
+    }
+
+
 class Handler(BaseHTTPRequestHandler):
-    def send_data(self,data,ctype="application/json; charset=utf-8"):
-        body=json.dumps(data).encode() if isinstance(data,dict) else data
-        self.send_response(200);self.send_header("Content-Type",ctype);self.send_header("Content-Length",str(len(body)));self.end_headers();self.wfile.write(body)
+    def send_bytes(self, body, content_type, status=200):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def send_json(self, data, status=200):
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        self.send_bytes(body, "application/json; charset=utf-8", status)
+
     def do_GET(self):
-        if self.path=="/stats":return self.send_data(stats())
-        if self.path not in ("/","/index.html"):return self.send_error(404)
-        return self.send_data(PAGE.read_bytes(),"text/html; charset=utf-8")
-    def do_POST(self):
-        if self.path!="/chat":return self.send_error(404)
+        if self.path == "/stats":
+            return self.send_json(get_stats())
+        if self.path not in ("/", "/index.html"):
+            return self.send_json({"error": "Not found"}, 404)
         try:
-            n=min(int(self.headers.get("Content-Length","0")),12000)
-            prompt=json.loads(self.rfile.read(n) or b"{}").get("message","").strip()
-            if not prompt:return self.send_data({"reply":"Please say or type a message."})
-            history.append({"role":"user","content":prompt[:4000]})
-            if len(history)>25:del history[1:11]
-            try:
-                answer=brain.chat_turn(history);history.append({"role":"assistant","content":answer})
-            except Exception as exc:
-                history.pop();answer="Local AI unavailable. Start Ollama and install the selected model. "+str(exc)
-            return self.send_data({"reply":answer})
-        except Exception:return self.send_data({"reply":"I could not process that request."})
-    def log_message(self,*args):pass
-if __name__=="__main__":
-    server=ThreadingHTTPServer(("127.0.0.1",8000),Handler)
-    print(f"BALA JARVIS: http://127.0.0.1:8000 (model {brain.MODEL})")
-    if "--no-browser" not in sys.argv:webbrowser.open("http://127.0.0.1:8000")
-    server.serve_forever()
+            return self.send_bytes(PAGE.read_bytes(), "text/html; charset=utf-8")
+        except OSError:
+            return self.send_json({"error": "jarvis_ui.html is missing"}, 500)
+
+    def do_POST(self):
+        if self.path != "/chat":
+            return self.send_json({"error": "Not found"}, 404)
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > 12_000:
+                return self.send_json({"reply": "Message size is invalid."}, 413)
+            payload = json.loads(self.rfile.read(length))
+            prompt = payload.get("message", "")
+            if not isinstance(prompt, str):
+                return self.send_json({"reply": "Message must be text."}, 400)
+            prompt = prompt.strip()
+            if not prompt:
+                return self.send_json({"reply": "Please say or type a message."})
+            with chat_lock:
+                messages.append({"role": "user", "content": prompt[:4_000]})
+                if len(messages) > 41:
+                    del messages[1:21]
+                try:
+                    reply = brain.chat_turn(messages)
+                except Exception as exc:
+                    messages.pop()
+                    reply = (
+                        "My local AI could not respond. Check that Ollama is running "
+                        f"and model {brain.MODEL!r} is installed. Details: {exc}"
+                    )
+            return self.send_json({"reply": reply})
+        except (ValueError, json.JSONDecodeError):
+            return self.send_json({"reply": "The request was not valid JSON."}, 400)
+        except Exception:
+            return self.send_json({"reply": "I could not process that request."}, 500)
+
+    def log_message(self, *_args):
+        pass
+
+
+if __name__ == "__main__":
+    server = ThreadingHTTPServer(("127.0.0.1", 8000), Handler)
+    print(f"BALA JARVIS online at http://127.0.0.1:8000 (model: {brain.MODEL})")
+    webbrowser.open("http://127.0.0.1:8000")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nBALA JARVIS shutting down.")
+    finally:
+        server.server_close()
